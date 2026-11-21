@@ -1,0 +1,10 @@
+node_modules/
+playwright-report/
+test-results/
+site/
+.env*
+*.pdf
+*.zip
+*.bak
+backups/
+beine-kp-backup*.json
