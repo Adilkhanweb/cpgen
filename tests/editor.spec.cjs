@@ -20,6 +20,49 @@ test('public editor loads on desktop and mobile without script errors', async ({
   expect(errors).toEqual([]);
 });
 
+test('official Beine logo appears in the editor and print header', async ({ page }) => {
+  await openEditor(page);
+  const logo = page.locator('#paper .brand-header').getByRole('img', { name: 'Beine' });
+  await expect(logo).toBeVisible({ timeout: 2500 });
+  const appLogo = page.locator('#top').getByRole('img', { name: 'Beine' });
+  await expect(appLogo).toBeVisible();
+  const pdf = await page.pdf({ preferCSSPageSize: true, printBackground: true });
+  expect(pdf.toString('latin1').match(/\/Type\s*\/Page\b/g)).toHaveLength(1);
+  await expect(page.locator('#printPaper .brand-header [role="img"][aria-label="Beine"]')).toHaveCount(1);
+});
+
+test('agency details form saves to the document and carries over to print', async ({ page }) => {
+  await openEditor(page);
+  const editDetails = page.getByRole('button', { name: 'Изменить реквизиты' });
+  await expect(editDetails).toBeVisible({ timeout: 2500 });
+  await editDetails.click();
+  const form = page.getByRole('dialog', { name: 'Реквизиты агентства' });
+  await form.getByLabel('Наименование').fill('Демонстрационное агентство');
+  await form.getByLabel('Адрес').fill('Тестовый адрес');
+  await form.getByLabel('БИН / ИИН').fill('УЧЕБНЫЙ');
+  await form.getByLabel('БИК', { exact: true }).fill('TESTBIC');
+  await form.getByLabel('Счёт / IBAN').fill('ТЕСТОВЫЙ СЧЁТ');
+  await form.getByLabel('Дополнительные сведения').fill('Тестовый банк · БИК: пример\nКонтакт: тест');
+  await form.getByRole('button', { name: 'Применить' }).click();
+  const details = page.locator('#paper [data-field="requisites"]');
+  await expect(details).toContainText('Демонстрационное агентство');
+  await expect(details).toContainText('БИК: TESTBIC');
+  await expect(page.locator('#saveState')).toHaveText('Сохранено в браузере');
+  await page.reload();
+  await expect(details).toContainText('Тестовый адрес');
+  await editDetails.click();
+  await expect(form.getByLabel('БИК', { exact: true })).toHaveValue('TESTBIC');
+  await expect(form.getByLabel('Дополнительные сведения')).toHaveValue('Тестовый банк · БИК: пример\nКонтакт: тест');
+  await form.getByLabel('Наименование').fill('Не сохранять');
+  await form.getByRole('button', { name: 'Отмена' }).click();
+  await expect(details).not.toContainText('Не сохранять');
+  await page.locator('#previewToggle').click();
+  await expect(editDetails).toHaveCount(0);
+  await expect(details).toContainText('ТЕСТОВЫЙ СЧЁТ');
+  await page.pdf({ preferCSSPageSize: true });
+  await expect(page.locator('#printPaper [data-field="requisites"]')).toContainText('БИН / ИИН: УЧЕБНЫЙ');
+});
+
 test('table totals recalculate and styling persists through PDF export', async ({ page }) => {
   await openEditor(page);
   const total = page.locator('#paper .table-total');
